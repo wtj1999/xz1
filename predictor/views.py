@@ -13,7 +13,8 @@ from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-
+from .models import PredictionRecord
+from logger.models import LogRecord
 from .utils import get_model_service
 from .serializers import SinglePredictSerializer, BatchPredictSerializer
 
@@ -88,7 +89,15 @@ class PredictSingle(APIView):
             serializer.is_valid(raise_exception=True)
         except Exception as e:
             logger.debug("SinglePredict: validation failed: %s", e)
-            return Response({"error": "validation_error", "detail": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            LogRecord.objects.create(
+                level="ERROR",
+                message=f"Validation failed: {serializer.errors}"
+            )
+            return Response(
+                {"error": "validation_error", "detail": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
         # validated data: cleaned dict (按 feature_cols 顺序)
         cleaned = serializer.validated_data['data']
@@ -98,8 +107,22 @@ class PredictSingle(APIView):
             df = pd.DataFrame([cleaned], columns=svc.feature_cols)  # 保证列顺序
             preds = svc.predict(df)
             elapsed = time.time() - t0
+            prediction_value = float(preds[0])
+
+            # 保存预测结果到 predictor 数据库
+            PredictionRecord.objects.create(
+                input_data=cleaned,
+                prediction=prediction_value
+            )
+
+            # 写日志到 logger 数据库
+            LogRecord.objects.create(
+                level="INFO",
+                message=f"Prediction success, value={prediction_value}, elapsed={elapsed:.3f}s"
+            )
+
             resp = {
-                "prediction": float(preds[0]),
+                "prediction": prediction_value,
                 "model_version": getattr(svc, "model_version", None),
                 "elapsed_seconds": round(elapsed, 4)
             }
@@ -107,7 +130,14 @@ class PredictSingle(APIView):
             return Response(resp)
         except Exception as e:
             logger.exception("SinglePredict: predict failed")
-            return Response({"error": "predict_failed", "detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            LogRecord.objects.create(
+                level="ERROR",
+                message=f"Prediction failed: {str(e)}"
+            )
+            return Response(
+                {"error": "predict_failed", "detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class PredictBatch(APIView):

@@ -69,7 +69,8 @@ class PredictorAPITest(TestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertIn("predictions", response.json())
             self.assertEqual(len(response.json()["predictions"]), 2)
-
+            result = response.json()
+            print(result)
     def test_file_predict(self):
         """测试文件上传预测 /api/predict/file/"""
         # 构造一个 CSV 文件（内存中生成）

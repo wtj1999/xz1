@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     'rest_framework',
     'predictor.apps.PredictorConfig',
+    'logger'
 ]
 
 MIDDLEWARE = [
@@ -83,10 +84,23 @@ WSGI_APPLICATION = "xz1.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+        "NAME": BASE_DIR / "db.sqlite3",   # 主库，存预测结果
+    },
+    "logger_db": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "logger_db.sqlite3",   # 日志单独存
+    },
 }
 
+DATABASE_APPS_MAPPING = {
+    "logger": "logger_db",
+    "predictor": "default",
+}
+
+DATABASE_ROUTERS = ["xz1.database_router.DatabaseAppsRouter"]
+
+#python manage.py makemigrations logger
+#python manage.py migrate logger --database=logger_db
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
